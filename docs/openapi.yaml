@@ -1,0 +1,490 @@
+openapi: 3.1.0
+info:
+  title: Task Management API
+  version: 1.0.0
+  description: >-
+    A Sanctum-authenticated API for managing personal projects and tasks.
+    All endpoints are available under /api. User responses contain only public
+    profile fields and never include passwords or password hashes.
+servers:
+  - url: http://localhost:8000/api
+    description: Local development
+tags:
+  - name: Authentication
+  - name: Projects
+  - name: Tasks
+security:
+  - bearerAuth: []
+paths:
+  /register:
+    post:
+      tags: [Authentication]
+      summary: Register a user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, password_confirmation]
+              properties:
+                name: { type: string, maxLength: 255 }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                password_confirmation: { type: string }
+      responses:
+        '201':
+          description: Account created and token issued
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /login:
+    post:
+      tags: [Authentication]
+      summary: Log in and issue a token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthResponse' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /logout:
+    post:
+      tags: [Authentication]
+      summary: Revoke the current token
+      responses:
+        '200':
+          description: Token revoked
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [message]
+                properties:
+                  message: { type: string, example: Logout successful. }
+        '401': { $ref: '#/components/responses/ApiError' }
+  /me:
+    get:
+      tags: [Authentication]
+      summary: Get the current user
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/ApiError' }
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List the current user's projects
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 255 }
+          description: Substring match against project name and description
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ProjectStatus' }
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [created_at, updated_at, name, status] }
+          description: Defaults to created_at descending when omitted
+        - name: sort_direction
+          in: query
+          schema: { type: string, enum: [asc, desc], default: asc }
+          description: Applies when sort_by is provided
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - { $ref: '#/components/parameters/Page' }
+      responses:
+        '200':
+          description: Paginated projects with task counts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Project' }
+                  links: { type: object }
+                  meta: { type: object }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Projects]
+      summary: Create a project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectInput' }
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Project' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /projects/{project}:
+    parameters:
+      - name: project
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Projects]
+      summary: Get a project and its task count
+      responses:
+        '200':
+          description: Project details and task count
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Project' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+    put:
+      tags: [Projects]
+      summary: Update project fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProjectUpdateInput' }
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Project' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    patch:
+      tags: [Projects]
+      summary: Update project fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdateInput'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Project' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Projects]
+      summary: Delete a project and its tasks
+      responses:
+        '204': { description: Project deleted }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Search and filter the current user's tasks
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string, maxLength: 255 }
+          description: Substring match against title and description
+        - name: project_id
+          in: query
+          schema: { type: integer }
+          description: Filter by a project owned by the authenticated user
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/TaskStatus' }
+        - name: priority
+          in: query
+          schema: { $ref: '#/components/schemas/TaskPriority' }
+        - name: due_date_from
+          in: query
+          schema: { type: string, format: date }
+          description: Inclusive start date
+        - name: due_date_to
+          in: query
+          schema: { type: string, format: date }
+          description: Inclusive end date; must be on or after due_date_from
+        - name: sort_by
+          in: query
+          schema: { type: string, enum: [created_at, updated_at, due_date, title, priority] }
+          description: Defaults to created_at descending when omitted
+        - name: sort_direction
+          in: query
+          schema: { type: string, enum: [asc, desc], default: asc }
+          description: Applies when sort_by is provided
+        - name: per_page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 10 }
+        - { $ref: '#/components/parameters/Page' }
+      responses:
+        '200':
+          description: Paginated tasks with their project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Task' }
+                  links: { type: object }
+                  meta: { type: object }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Tasks]
+      summary: Create a task in one of the current user's projects
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskInput' }
+      responses:
+        '201':
+          description: Task created with its project resource
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+  /tasks/{task}:
+    parameters:
+      - name: task
+        in: path
+        required: true
+        schema: { type: integer }
+    get:
+      tags: [Tasks]
+      summary: Get a task and its project
+      responses:
+        '200':
+          description: Task details and its project resource
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+    put:
+      tags: [Tasks]
+      summary: Update task fields
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TaskUpdateInput' }
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    patch:
+      tags: [Tasks]
+      summary: Partially update a task
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaskUpdateInput'
+      responses:
+        '200':
+          description: Task updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Task' }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Tasks]
+      summary: Delete a task
+      responses:
+        '204': { description: Task deleted }
+        '401': { $ref: '#/components/responses/ApiError' }
+        '403': { $ref: '#/components/responses/ApiError' }
+        '404': { $ref: '#/components/responses/ApiError' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: Sanctum token
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+  responses:
+    ApiError:
+      description: Standard API error response
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+    ValidationError:
+      description: Input validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+  schemas:
+    ApiError:
+      type: object
+      required: [success, message, error, errors]
+      properties:
+        success: { type: boolean, const: false }
+        message: { type: string }
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [UNAUTHENTICATED, FORBIDDEN, NOT_FOUND, METHOD_NOT_ALLOWED, VALIDATION_ERROR, TOO_MANY_REQUESTS, INTERNAL_SERVER_ERROR, HTTP_ERROR]
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: string }
+    User:
+      type: object
+      description: Public user fields. Passwords and password hashes are never returned.
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        email: { type: string, format: email }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    AuthResponse:
+      type: object
+      properties:
+        message: { type: string }
+        data:
+          type: object
+          properties:
+            user: { $ref: '#/components/schemas/User' }
+            token: { type: string }
+    ProjectStatus:
+      type: string
+      enum: [active, completed, archived]
+    ProjectInput:
+      type: object
+      required: [name, status]
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: [string, 'null'] }
+        status: { type: string, enum: [active, completed, archived] }
+    ProjectUpdateInput:
+      type: object
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: [string, 'null'] }
+        status: { type: string, enum: [active, completed, archived] }
+    Project:
+      type: object
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        status: { type: string, enum: [active, completed, archived] }
+        task_count: { type: integer }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+    TaskStatus:
+      type: string
+      enum: [pending, in_progress, completed, cancelled]
+    TaskPriority:
+      type: string
+      enum: [low, medium, high, urgent]
+    TaskInput:
+      type: object
+      required: [project_id, title]
+      properties:
+        project_id: { type: integer }
+        title: { type: string, maxLength: 255 }
+        description: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        due_date: { type: [string, 'null'], format: date }
+    TaskUpdateInput:
+      type: object
+      properties:
+        project_id: { type: integer }
+        title: { type: string, maxLength: 255 }
+        description: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        due_date: { type: [string, 'null'], format: date }
+    Task:
+      type: object
+      properties:
+        id: { type: integer }
+        project_id: { type: integer }
+        project: { $ref: '#/components/schemas/Project' }
+        title: { type: string }
+        description: { type: [string, 'null'] }
+        status: { $ref: '#/components/schemas/TaskStatus' }
+        priority: { $ref: '#/components/schemas/TaskPriority' }
+        due_date: { type: [string, 'null'], format: date }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }

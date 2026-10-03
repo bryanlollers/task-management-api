@@ -1,0 +1,184 @@
+{
+  "info": {
+    "name": "Task Management API",
+    "description": "Sanctum-authenticated project and task management API. Register or log in to set the token variable before using protected requests.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8000/api" },
+    { "key": "token", "value": "" },
+    { "key": "projectId", "value": "1" },
+    { "key": "taskId", "value": "1" },
+    { "key": "email", "value": "portfolio@example.com" },
+    { "key": "password", "value": "password123" }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Portfolio User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\",\n  \"password_confirmation\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/register"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('token', pm.response.json().data.token);",
+              "}"
+            ] }
+          }]
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/login"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set('token', pm.response.json().data.token);",
+              "}"
+            ] }
+          }]
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/me"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }],
+            "url": "{{baseUrl}}/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Projects",
+      "item": [
+        {
+          "name": "List projects",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/projects" }
+        },
+        {
+          "name": "Create project",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Portfolio Website\",\n  \"description\": \"Tasks for building my portfolio\",\n  \"status\": \"active\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/projects"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('projectId', pm.response.json().data.id);",
+              "}"
+            ] }
+          }]
+        },
+        {
+          "name": "Get project",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/projects/{{projectId}}" }
+        },
+        {
+          "name": "Update project",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"completed\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/projects/{{projectId}}"
+          }
+        },
+        {
+          "name": "Delete project",
+          "request": { "method": "DELETE", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/projects/{{projectId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "List tasks (search, filters, dates, and sort)",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/tasks?search=Draft&project_id={{projectId}}&status=pending&priority=high&due_date_from=2026-01-01&sort_by=due_date&sort_direction=asc" }
+        },
+        {
+          "name": "Create task",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"project_id\": {{projectId}},\n  \"title\": \"Draft project case study\",\n  \"description\": \"Write a short overview of the project\",\n  \"status\": \"pending\",\n  \"priority\": \"high\",\n  \"due_date\": \"2026-12-31\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": "{{baseUrl}}/tasks"
+          },
+          "event": [{
+            "listen": "test",
+            "script": { "type": "text/javascript", "exec": [
+              "if (pm.response.code === 201) {",
+              "  pm.collectionVariables.set('taskId', pm.response.json().data.id);",
+              "}"
+            ] }
+          }]
+        },
+        {
+          "name": "Get task",
+          "request": { "method": "GET", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/tasks/{{taskId}}" }
+        },
+        {
+          "name": "Update task",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Accept", "value": "application/json" }, { "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"in_progress\",\n  \"priority\": \"medium\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": "{{baseUrl}}/tasks/{{taskId}}"
+          }
+        },
+        {
+          "name": "Delete task",
+          "request": { "method": "DELETE", "header": [{ "key": "Accept", "value": "application/json" }], "url": "{{baseUrl}}/tasks/{{taskId}}" }
+        }
+      ]
+    }
+  ]
+}
